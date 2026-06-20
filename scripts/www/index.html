@@ -181,11 +181,22 @@ function addBrick(x,z){
   terrainObjects.push({obj:g,col:x,row:z,type:'brick'});
 }
 
+// Load sn.png texture for steel walls
+let steelTex=null;
+const texLoader=new THREE.TextureLoader();
+texLoader.load('sn.png',function(tex){
+  steelTex=tex;steelTex.wrapS=steelTex.wrapT=THREE.RepeatWrapping;
+  steelTex.magFilter=steelTex.minFilter=THREE.NearestFilter;
+  steelTex.colorSpace=THREE.SRGBColorSpace;
+  // Update all existing steel bodies
+  terrainObjects.forEach(t=>{if(t.type==='steel'){t.obj.children.forEach(ch=>{if(ch.name==='steel-body'&&ch.material){ch.material.map=steelTex;ch.material.needsUpdate=true;}});}});
+},undefined,()=>{});
+
 function addSteel(x,z){
   const g=new THREE.Group();
   const layerH=0.3,size=0.92;
-  const ssMat=new THREE.MeshStandardMaterial({color:0xd0c8b8,roughness:0.6,metalness:0.05}); // light concrete
-  const darkMat=new THREE.MeshStandardMaterial({color:0xc0b8a8,roughness:0.65,metalness:0.05});
+  const ssMat=new THREE.MeshStandardMaterial({map:steelTex,color:steelTex?0xcccccc:0xd0c8b8,roughness:steelTex?0.5:0.6,metalness:0.05});
+  const darkMat=new THREE.MeshStandardMaterial({map:steelTex,color:steelTex?0xbbbbbb:0xc0b8a8,roughness:steelTex?0.55:0.65,metalness:0.05});
   // 3 horizontal layers of stainless steel
   for(let layer=0;layer<3;layer++){
     const ly=layer*layerH+layerH/2;
@@ -208,7 +219,7 @@ function addSteel(x,z){
   }
   // Top plate
   const top=new THREE.Mesh(new THREE.BoxGeometry(size,0.03,size),
-    new THREE.MeshStandardMaterial({color:0xc8c0b0,roughness:0.55,metalness:0.05}));
+    new THREE.MeshStandardMaterial({map:steelTex,color:steelTex?0xcccccc:0xc8c0b0,roughness:0.5,metalness:0.05}));
   top.position.y=0.9;g.add(top);
   g.position.set(x+0.5,0,z+0.5);scene.add(g);
   terrainObjects.push({obj:g,col:x,row:z,type:'steel'});
@@ -442,7 +453,7 @@ function updateSteelCracks(c,r){
   const hp=G.tileHp[r][c];
   const steel=terrainObjects.find(t=>t.col===c&&t.row===r&&t.type==='steel');
   if(!steel||!steel.obj)return;const g=steel.obj;
-  for(let i=g.children.length-1;i>=0;i--){if(g.children[i].name==='crack')g.remove(g.children[i]);}
+  for(let i=g.children.length-1;i>=0;i--){if(g.children[i].name==='crack'||g.children[i].name==='top-cap')g.remove(g.children[i]);}
   if(hp<=0)return;
   // Scale each steel-body layer down based on HP (same as bricks)
   const scale=hp/3;
@@ -451,6 +462,11 @@ function updateSteelCracks(c,r){
   });
   // Darken
   g.children.forEach(ch=>{if(ch.name==='steel-body'&&ch.material)ch.material.color.setHex(hp===1?0xbcc0c4:0xd4d8dc);});
+  // Top cap with sn.png texture
+  const capGeo=new THREE.BoxGeometry(0.92,0.04,0.92);
+  const capMat=new THREE.MeshStandardMaterial({map:steelTex,color:steelTex?0xcccccc:0xd0c8b8,roughness:0.5,metalness:0.05});
+  const cap=new THREE.Mesh(capGeo,capMat);cap.name='top-cap';
+  cap.position.y=0.9*scale;g.add(cap);
   // Cracks on remaining surface — same style as bricks
   const S=0.47,crMat=new THREE.MeshBasicMaterial({color:0x111111,transparent:true,opacity:0.85,depthTest:true,depthWrite:false});
   const cy=0.9*scale*0.5;
